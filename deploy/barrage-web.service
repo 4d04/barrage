@@ -1,0 +1,24 @@
+[Unit]
+Description=Block Barrage web (block feed, score relay, static game)
+After=network-online.target barrage-game.service
+
+[Service]
+User=barrage
+WorkingDirectory=/opt/barrage/app
+Environment=CANOPY_RPC=http://127.0.0.1:31002
+Environment=PLUGIN_RPC=http://127.0.0.1:31010
+Environment=CHAIN_ID=2
+Environment=TRUST_PROXY=1
+Environment=PORT=8790
+# signs submit_score; made on the server with `node server/keygen.js /opt/barrage/arcade-key.json`, never copied off it
+Environment=ARCADE_KEY_FILE=/opt/barrage/arcade-key.json
+ExecStart=/opt/node/bin/node server/server.js
+Restart=always
+RestartSec=2
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

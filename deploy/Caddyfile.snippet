@@ -1,0 +1,12 @@
+# Block Barrage: add next to the abbey site block. Only the web server is public; node and plugin RPC stay on loopback.
+# Caddy flushes text/event-stream (the block feed) as it arrives.
+barrage.skylabs.ventures {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+	reverse_proxy 127.0.0.1:8790
+}

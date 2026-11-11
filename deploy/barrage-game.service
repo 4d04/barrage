@@ -1,0 +1,32 @@
+[Unit]
+Description=Block Barrage chain (chain 2, its own root; barrage plugin, 500ms blocks)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=barrage
+Group=barrage
+# the core runs plugin/barrage/pluginctl.sh relative to its checkout; the plugin stays in this unit's cgroup
+WorkingDirectory=/opt/barrage/canopy
+Environment=CANOPY_DATA_DIR=/opt/barrage/data/game
+Environment=BARRAGE_CHAIN_ID=2
+Environment=BARRAGE_PLUGIN_RPC=127.0.0.1:31010
+# the plugin socket folder (needs the patched core from chain/setup.sh)
+Environment=CANOPY_PLUGIN_SOCKET_DIR=/opt/barrage/data/game/plugin
+Environment=PATH=/opt/node/bin:/usr/local/bin:/usr/bin:/bin
+# BARRAGE_ARCADE_AUTHORITY=<address of /opt/barrage/arcade-key.json>, the only key allowed to submit scores
+EnvironmentFile=/opt/barrage/barrage.env
+ExecStart=/bin/sh -c 'exec /opt/barrage/bin/canopy --data-dir /opt/barrage/data/game --password "$(cat /opt/barrage/.password)" --nickname barrage start'
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+StandardOutput=null
+StandardError=journal
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/barrage/data/game
+
+[Install]
+WantedBy=multi-user.target

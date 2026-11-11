@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Block Barrage</title>
+<meta name="description" content="An 8-bit shooter where every 500ms Canopy block spawns a new invader.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 8' shape-rendering='crispEdges'><path fill='%235af0ff' d='M5 0h1v1h1v3h1v1h3v2H0V5h3V4h1V1h1z'/><path fill='%23ff5a5a' d='M4 7h1v1H4zM6 7h1v1H6z'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #07071a; --panel: #12123a; --line: #3a3aa8; --text: #eef0ff; --muted: #9a9cd0;
+    --cyan: #5af0ff; --lime: #b4f07a; --gold: #ffd23f; --pink: #ff6ad5; --red: #ff5a5a;
+    --px: 'Press Start 2P', ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--px); }
+  body { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; padding: 14px 16px; gap: 12px; }
+  header { text-align: center; }
+  h1 { margin: 0; font-size: clamp(18px, 4vw, 30px); color: var(--cyan); text-shadow: 3px 3px 0 #2a2a8a; letter-spacing: 2px; }
+  .sub { margin-top: 8px; font-size: 9px; line-height: 1.7; color: var(--muted); }
+  .sub b { color: var(--gold); font-weight: normal; }
+  main { display: flex; gap: 16px; align-items: flex-start; justify-content: center; width: 100%; max-width: 1100px; flex-wrap: wrap; }
+  .stage { position: relative; border: 4px solid var(--line); box-shadow: 0 0 0 4px #000, 8px 8px 0 4px #000; background: #000; line-height: 0;
+    width: min(100%, 576px, calc((100dvh - 120px) * 0.75)); aspect-ratio: 3 / 4; }
+  canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+  .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    background: rgba(7, 7, 26, 0.7); line-height: 1.6; text-align: center; padding: 16px; }
+  .overlay[hidden] { display: none; }
+  #title { cursor: pointer; }
+  .big { font-size: clamp(16px, 4.4vw, 26px); color: var(--cyan); text-shadow: 3px 3px 0 #000; }
+  .blink { animation: blink 1s steps(2, start) infinite; color: var(--gold); font-size: clamp(11px, 2.2vw, 15px); }
+  @keyframes blink { to { visibility: hidden; } }
+  .small { font-size: 8px; color: var(--muted); max-width: 400px; line-height: 2; }
+  .small b { color: var(--text); font-weight: normal; }
+  .score { font-size: clamp(14px, 3.4vw, 22px); color: var(--gold); }
+  .stats { display: grid; grid-template-columns: auto auto; gap: 6px 18px; font-size: 9px; text-align: left; color: var(--muted); }
+  .stats b { color: var(--text); font-weight: normal; text-align: right; }
+  form { display: flex; gap: 10px; align-items: center; }
+  input { font: inherit; font-size: 18px; width: 5.5ch; text-align: center; text-transform: uppercase; background: #000; color: var(--gold);
+    border: 3px solid var(--gold); padding: 8px 4px; outline: none; letter-spacing: 4px; }
+  button { font: inherit; font-size: 10px; background: var(--cyan); color: #07071a; border: 0; padding: 11px 14px; cursor: pointer; box-shadow: 4px 4px 0 #2a2a8a; }
+  button:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #2a2a8a; }
+  button.ghost { background: transparent; color: var(--muted); box-shadow: none; border: 2px solid var(--line); }
+  .msg { font-size: 9px; color: var(--pink); min-height: 1em; line-height: 1.8; max-width: 420px; }
+  .msg.ok { color: var(--lime); }
+  aside { width: 270px; display: flex; flex-direction: column; gap: 14px; }
+  .panel { background: var(--panel); border: 4px solid var(--line); padding: 12px; box-shadow: 4px 4px 0 #000; }
+  .panel h2 { margin: 0 0 12px; font-size: 10px; color: var(--gold); }
+  ol { margin: 0; padding: 0; list-style: none; font-size: 9px; line-height: 2.2; }
+  ol li { display: grid; grid-template-columns: 2.4em 3.4em 1fr; }
+  ol li .s { text-align: right; color: var(--text); }
+  ol li.me { color: var(--pink); }
+  ol li:first-child { color: var(--gold); }
+  ol li.empty { display: block; color: var(--muted); font-size: 8px; line-height: 1.8; }
+  .tip { font-size: 15px; color: var(--cyan); margin-bottom: 6px; }
+  .chainline { font-size: 8px; color: var(--muted); line-height: 1.9; }
+  .chainline b { color: var(--text); font-weight: normal; }
+  .rail { display: flex; gap: 3px; margin: 10px 0 4px; height: 14px; overflow: hidden; }
+  .rail i { flex: 0 0 14px; height: 14px; background: #2a2a8a; }
+  .rail i.new { background: var(--cyan); }
+  .feed { font-size: 8px; line-height: 1.9; color: var(--muted); }
+  .feed div:first-child { color: var(--lime); }
+  .legend { font-size: 8px; line-height: 2.1; color: var(--muted); }
+  .legend span { color: var(--text); }
+  .legend .g { color: var(--gold); }
+  .touch { display: none; position: absolute; right: 10px; bottom: 28px; pointer-events: none; }
+  .touch button { pointer-events: auto; width: 62px; height: 62px; font-size: 9px; opacity: 0.6; background: #000; color: var(--gold); border: 3px solid var(--gold); box-shadow: none; border-radius: 50%; }
+  @media (pointer: coarse) { .touch { display: block; } }
+  footer { font-size: 8px; color: var(--muted); line-height: 1.9; text-align: center; max-width: 860px; }
+  footer kbd { color: var(--text); font-family: inherit; }
+  .mute { padding: 4px 6px; font-size: 7px; margin-left: 8px; vertical-align: middle; }
+  @media (max-width: 640px) { aside { width: 100%; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>BLOCK BARRAGE</h1>
+  <div class="sub">Every <b>Canopy block</b> spawns an invader. One lands every <b id="hdrms">500ms</b>. <button class="ghost mute" id="mute" type="button">SOUND ON</button></div>
+</header>
+
+<main>
+  <div class="stage" id="stage">
+    <canvas id="game" width="192" height="256" aria-label="Block Barrage game"></canvas>
+    <div class="touch"><button id="bombBtn" type="button">BOMB</button></div>
+
+    <div class="overlay" id="title">
+      <div class="big">BLOCK BARRAGE</div>
+      <div class="small">The chain makes a block every half second.<br>Every block drops an invader. Hold the line.</div>
+      <div class="blink" id="startText">CLICK TO PLAY</div>
+      <div class="small"><b>MOVE</b> mouse, finger or arrows &middot; <b>FIRE</b> is automatic<br><b>BOMB</b> space or right-click &middot; <b>P</b> pause &middot; <b>M</b> mute</div>
+      <div class="small" id="modeNote"></div>
+    </div>
+
+    <div class="overlay" id="over" hidden>
+      <div class="big">GAME OVER</div>
+      <div class="score" id="finalScore">0</div>
+      <div class="stats" id="finalStats"></div>
+      <form id="scoreForm" autocomplete="off">
+        <input id="initials" maxlength="3" placeholder="AAA" aria-label="Your initials" spellcheck="false">
+        <button type="submit" id="submitBtn">SEAL SCORE</button>
+      </form>
+      <div class="msg" id="sealMsg"></div>
+      <button class="ghost" id="againBtn" type="button">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <aside>
+    <div class="panel">
+      <h2>HIGH SCORES</h2>
+      <ol id="board"><li class="empty">Loading the board from the chain...</li></ol>
+    </div>
+    <div class="panel">
+      <h2>THE CHAIN</h2>
+      <div class="tip" id="tip">#-</div>
+      <div class="chainline">Block time <b id="avgms">-</b> &middot; <b id="mode">connecting</b></div>
+      <div class="rail" id="rail"></div>
+      <div class="feed" id="feed"></div>
+    </div>
+    <div class="panel legend">
+      <h2>MULTIPLIER</h2>
+      Feats charge the meter under your <span>xN</span>. Fill it and the multiplier steps up; each step needs a little more.<br>
+      <span class="g">FINALITY</span> kill it before the next block lands<br>
+      <span class="g">DOUBLE / TRIPLE / MEGA</span> several at once<br>
+      <span class="g">COMBO</span> every 8 kills in a row<br>
+      <span class="g">UNBROKEN</span> 40 blocks without a hit<br>
+      <span class="g">CENTURY</span> beat the boss on a block ending 00<br>
+      Four blocks without a kill halves it. A hit resets it. Max <span>x32</span>.
+    </div>
+  </aside>
+</main>
+
+<footer>
+  Power chips: <kbd>P</kbd> weapon up &middot; <kbd>R</kbd> rapid fire &middot; <kbd>S</kbd> shield &middot; <kbd>B</kbd> bomb &middot; <kbd>H</kbd> extra life.
+  No sign-in and no wallet: the arcade relays your score to the chain, sealed in a block about a second later.
+</footer>
+
+<script type="module" src="game.js"></script>
+</body>
+</html>

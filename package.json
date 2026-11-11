@@ -1,0 +1,17 @@
+{
+  "name": "block-barrage",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An 8-bit fixed shooter where every 500ms Canopy block spawns an invader, on its own nested chain.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server/server.js",
+    "keygen": "node server/keygen.js",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "@noble/curves": "2.0.1",
+    "protobufjs": "7.5.4"
+  }
+}
