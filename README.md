@@ -194,3 +194,8 @@ Nothing here has been deployed.
 - **Plugin state is consensus state.** Changing `maxScore` or the board rules changes how `submit_score` executes. Do
   it on a fresh chain or behind an activation height.
 - **Fast blocks are unreleased core code** (canopy#648, pinned at `4313b031`). Production would mean running that fork.
+
+## License
+
+MIT: see [LICENSE](LICENSE). `plugin/` is built from the Canopy plugin template and `chain/*.patch` modify the Canopy
+core, both MIT-licensed by Canopy Network; their notice is in [plugin/LICENSE.canopy](plugin/LICENSE.canopy).
