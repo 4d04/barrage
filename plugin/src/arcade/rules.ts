@@ -4,7 +4,7 @@
  */
 
 export const MAX_MULT = 32;
-export const TIER_BLOCKS = 30;
+export const TIER_BLOCKS = 24;
 export const MAX_TIER = 20;
 export const MAX_POWER = 8;
 /** a run can't be longer than this many blocks (about 5.8 days at 500ms) */

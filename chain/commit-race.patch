@@ -1,0 +1,19 @@
+diff --git a/bft/msg.go b/bft/msg.go
+index 8fab85cc..b92cc92a 100644
+--- a/bft/msg.go
++++ b/bft/msg.go
+@@ -190,7 +190,13 @@ func (b *BFT) CheckProposerMessage(x *Message, p *validateMessageParams) (isPart
+ 		}
+ 	}
+ 	// validate the Quorum Certificate
+-	isPartialQC, err = x.Qc.Check(vals, b.LoadMaxBlockSize(), p.view, false)
++	// Local patch (not upstream): read the block size under the controller lock. Consensus messages are handled
++	// without it, and a commit can reset the FSM store mid-read ("panic: pebble: closed"); at 36ms blocks that
++	// happens within minutes.
++	b.Controller.Lock()
++	maxBlockSize := b.LoadMaxBlockSize()
++	b.Controller.Unlock()
++	isPartialQC, err = x.Qc.Check(vals, maxBlockSize, p.view, false)
+ 	if err != nil {
+ 		return
+ 	}

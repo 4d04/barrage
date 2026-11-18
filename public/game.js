@@ -490,7 +490,7 @@ function collect(p) {
     case 'R': player.rapid = 8; popup('RAPID FIRE', p.x, p.y - 6, C.lime); break;
     case 'S': player.shield = 1; popup('SHIELD', p.x, p.y - 6, C.cyan); break;
     case 'B': player.bombs = Math.min(3, player.bombs + 1); popup('+BOMB', p.x, p.y - 6, C.orange); break;
-    case 'H': if (player.lives < 5) { player.lives++; popup('+LIFE', p.x, p.y - 6, C.pink); } else feat('MAXED', FEATS.maxedPickup, 0, p.x, p.y - 6); break;
+    case 'H': if (player.lives < 4) { player.lives++; popup('+LIFE', p.x, p.y - 6, C.pink); } else feat('MAXED', FEATS.maxedPickup, 0, p.x, p.y - 6); break;
   }
 }
 
@@ -510,9 +510,9 @@ function fire() {
   SFX.shot();
 }
 
-function aimAt(e, speed) {
-  const dx = player.x - e.x, dy = player.y - e.y, d = Math.hypot(dx, dy) || 1;
-  ebullets.push({ x: e.x, y: e.y + e.h / 2, vx: (dx / d) * speed, vy: (dy / d) * speed });
+function aimAt(e, speed, off = 0) {
+  const a = Math.atan2(player.y - e.y, player.x - e.x) + off;
+  ebullets.push({ x: e.x, y: e.y + e.h / 2, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed });
 }
 
 function updateEnemy(e, dt) {
@@ -520,40 +520,40 @@ function updateEnemy(e, dt) {
   const s = e.speed;
   switch (e.type) {
     case 'drone':
-      e.y += 13 * s * dt; e.x = e.anchorX + Math.sin((e.t + e.phase * 6) * 1.6) * 10;
+      e.y += 16 * s * dt; e.x = e.anchorX + Math.sin((e.t + e.phase * 6) * 1.6) * 10;
       break;
     case 'zigzag':
-      e.y += 17 * s * dt; e.x += e.vx * dt;
+      e.y += 21 * s * dt; e.x += e.vx * dt;
       if (e.x < e.w / 2 + 2 || e.x > W - e.w / 2 - 2) { e.vx = -e.vx; e.x = Math.max(e.w / 2 + 2, Math.min(W - e.w / 2 - 2, e.x)); }
       break;
     case 'gunner':
-      if (e.y < 60 + e.phase * 50) e.y += 22 * s * dt; else { e.y += 3 * s * dt; e.x = e.anchorX + Math.sin(e.t * 0.9) * 24; }
+      if (e.y < 60 + e.phase * 50) e.y += 28 * s * dt; else { e.y += 4 * s * dt; e.x = e.anchorX + Math.sin(e.t * 0.9) * 24; }
       e.fireCd -= dt;
-      if (e.fireCd <= 0 && e.y > TOP + 10) { e.fireCd = Math.max(0.9, 2.4 - 0.08 * e.tier); aimAt(e, 62 * s); }
+      if (e.fireCd <= 0 && e.y > TOP + 10) { e.fireCd = Math.max(0.7, 2.1 - 0.1 * e.tier); aimAt(e, 72 * s); if (e.tier >= 6) aimAt(e, 72 * s, 0.22); }
       break;
     case 'splitter':
-      e.y += 15 * s * dt; e.x = e.anchorX + Math.sin(e.t * 2.2) * 6;
+      e.y += 19 * s * dt; e.x = e.anchorX + Math.sin(e.t * 2.2) * 6;
       break;
     case 'mini':
       e.x += e.vx * dt; e.y += e.vy * s * dt; e.vx *= 1 - 0.9 * dt;
       break;
     case 'tank':
-      e.y += 7 * s * dt;
+      e.y += 9 * s * dt;
       e.fireCd -= dt;
-      if (e.fireCd <= 0) { e.fireCd = Math.max(1.3, 3 - 0.08 * e.tier); ebullets.push({ x: e.x, y: e.y + e.h / 2, vx: 0, vy: 70 * s }); }
+      if (e.fireCd <= 0) { e.fireCd = Math.max(1.0, 2.6 - 0.1 * e.tier); ebullets.push({ x: e.x, y: e.y + e.h / 2, vx: 0, vy: 80 * s }); }
       break;
     case 'diver':
-      if (e.state === 0) { e.y += 28 * s * dt; if (e.y > 46 + e.phase * 30) { e.state = 1; e.t = 0; } }
-      else if (e.state === 1) { if (e.t > 0.9) { e.state = 2; const dx = player.x - e.x, dy = player.y - e.y, d = Math.hypot(dx, dy) || 1; e.vx = (dx / d) * 130 * s; e.vy = (dy / d) * 130 * s; } }
+      if (e.state === 0) { e.y += 34 * s * dt; if (e.y > 46 + e.phase * 30) { e.state = 1; e.t = 0; } }
+      else if (e.state === 1) { if (e.t > 0.7) { e.state = 2; const dx = player.x - e.x, dy = player.y - e.y, d = Math.hypot(dx, dy) || 1; e.vx = (dx / d) * 150 * s; e.vy = (dy / d) * 150 * s; } }
       else { e.x += e.vx * dt; e.y += e.vy * dt; }
       break;
     case 'weaver':
-      e.y += 10 * s * dt; e.x = e.anchorX + Math.sin(e.t * 1.3 + e.phase * 6) * 40;
+      e.y += 13 * s * dt; e.x = e.anchorX + Math.sin(e.t * 1.3 + e.phase * 6) * 40;
       e.x = Math.max(e.w / 2, Math.min(W - e.w / 2, e.x));
       e.fireCd -= dt;
       if (e.fireCd <= 0 && e.y > TOP + 10) {
-        e.fireCd = Math.max(1.2, 2.8 - 0.08 * e.tier);
-        for (const a of [-0.35, 0, 0.35]) ebullets.push({ x: e.x, y: e.y + 4, vx: Math.sin(a) * 60 * s, vy: Math.cos(a) * 60 * s });
+        e.fireCd = Math.max(0.9, 2.4 - 0.1 * e.tier);
+        for (const a of [-0.35, 0, 0.35]) ebullets.push({ x: e.x, y: e.y + 4, vx: Math.sin(a) * 69 * s, vy: Math.cos(a) * 69 * s });
       }
       break;
     case 'century':
@@ -562,9 +562,9 @@ function updateEnemy(e, dt) {
       e.y = TOP + 14 + Math.sin(e.t * 0.8) * 6;
       e.fireCd -= dt;
       if (e.fireCd <= 0) {
-        e.fireCd = Math.max(0.8, 1.6 - 0.04 * e.tier);
-        if (Math.floor(e.t) % 3 === 2) for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI + Math.PI * 0.06; ebullets.push({ x: e.x, y: e.y + 4, vx: Math.cos(a) * 55, vy: Math.sin(a) * 55 }); }
-        else { aimAt(e, 75); }
+        e.fireCd = Math.max(0.6, 1.4 - 0.05 * e.tier);
+        if (Math.floor(e.t) % 3 === 2) for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI + Math.PI * 0.05; ebullets.push({ x: e.x, y: e.y + 4, vx: Math.cos(a) * 62, vy: Math.sin(a) * 62 }); }
+        else { aimAt(e, 86); }
       }
       e.life -= dt;
       if (e.life <= 0) { e.dead = true; e.escaped = true; popup('ESCAPED', e.x, e.y + 10, C.grey); }
@@ -821,4 +821,4 @@ loadBoard();
 setInterval(loadBoard, 15000);
 requestAnimationFrame(frame);
 // for the dev console and tests
-window.__barrage = { tick(dt) { update(dt); draw(); }, resume() { paused = false; }, get state() { return state; }, get run() { return run; }, get player() { return player; }, get enemies() { return enemies; }, feed, TIER_BLOCKS };
+window.__barrage = { tick(dt) { update(dt); draw(); }, resume() { paused = false; }, get state() { return state; }, get run() { return run; }, get player() { return player; }, get enemies() { return enemies; }, steer(p) { pointer = p; }, start, feed, TIER_BLOCKS };

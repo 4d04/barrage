@@ -7,7 +7,7 @@ const plugin = await import('../plugin/dist/arcade/rules.js');
 const HASH = 'a3f09c11d2e8b7c4559e0d1f6a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d';
 
 test('the plugin and the game agree on the score ceiling', () => {
-  for (const n of [0, 1, 29, 30, 31, 299, 600, 601, 1234, 10_000, 1_000_000]) assert.equal(BigInt(maxScore(n)), plugin.maxScore(n), `n=${n}`);
+  for (const n of [0, 1, 23, 24, 25, 479, 480, 481, 1234, 10_000, 1_000_000]) assert.equal(BigInt(maxScore(n)), plugin.maxScore(n), `n=${n}`);
   assert.equal(plugin.MAX_MULT, MAX_MULT);
   assert.equal(plugin.TIER_BLOCKS, TIER_BLOCKS);
 });

@@ -3,11 +3,11 @@
 //
 // Every block spawns exactly one invader. What it is, where it enters and what it drops come from the block's hash,
 // so everyone playing sees the same invader for the same block. How tough it is comes from how long the run has
-// lasted: every TIER_BLOCKS blocks (15 seconds) the tier goes up.
+// lasted: every TIER_BLOCKS blocks (12 seconds) the tier goes up.
 
 export const BLOCK_MS = 500;
 export const MAX_MULT = 32;
-export const TIER_BLOCKS = 30;
+export const TIER_BLOCKS = 24;
 export const MAX_TIER = 20;
 export const MAX_POWER = 8;
 export const CENTURY_MIN_BLOCKS = 20; // no boss in the first 10 seconds of a run
@@ -66,21 +66,21 @@ export function spawnFor(height, hash, n) {
     type = unlocked[Math.min(i, unlocked.length - 1)];
   }
   const e = ENEMIES[type];
-  // toughness grows 25% per tier, so the weapon upgrades stay necessary; divers stay fragile (they ram you)
-  const hp = century ? e.hp + 12 * tier : type === 'diver' ? e.hp + Math.floor(tier / 5) : Math.round(e.hp * (1 + 0.25 * tier));
+  // toughness grows 35% per tier, so the weapon upgrades stay necessary; divers stay fragile (they ram you)
+  const hp = century ? e.hp + 15 * tier : type === 'diver' ? e.hp + Math.floor(tier / 4) : Math.round(e.hp * (1 + 0.35 * tier));
   // drops: P power chip, S shield, R rapid fire, B bomb, H extra life
   const r = b[2];
   let drop = null;
   if (century) drop = 'P';
-  else if (r < 34) drop = 'P';
-  else if (r < 46) drop = 'R';
-  else if (r < 56) drop = 'S';
-  else if (r < 63) drop = 'B';
-  else if (r < 67) drop = 'H';
+  else if (r < 22) drop = 'P';
+  else if (r < 31) drop = 'R';
+  else if (r < 38) drop = 'S';
+  else if (r < 43) drop = 'B';
+  else if (r < 46) drop = 'H';
   return {
     type, height, tier, hp,
     x: 0.08 + (b[1] / 255) * 0.84,   // 0..1 across the playfield
-    speed: 1 + 0.06 * tier,
+    speed: 1 + 0.08 * tier,
     pts: e.pts * (1 + tier),
     drop,
     dir: b[3] & 1 ? 1 : -1,

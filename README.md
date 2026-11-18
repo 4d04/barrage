@@ -1,7 +1,7 @@
 # Block Barrage
 
 An 8-bit fixed shooter on its own Canopy chain. The chain makes a block every 500ms, and **every block spawns one
-invader**, labelled with its block height. Shoot them down before they reach the bottom. Waves get tougher every 15
+invader**, labelled with its block height. Shoot them down before they reach the bottom. Waves get tougher every 12
 seconds, power chips upgrade your ship, and the high-score board lives on the chain.
 
 There's no sign-in and no wallet. Open the page, click, play. When you seal a score, the arcade server signs a
@@ -19,7 +19,7 @@ There's no sign-in and no wallet. Open the page, click, play. When you seal a sc
 ## Run it locally
 
 Needs Node 22+ and Go (the build fetches Go 1.26.0 if needed). `setup.sh` clones the Canopy core into `chain/canopy`,
-pins it to canopy#648 at `4313b031` (the fast-blocks PR, not merged upstream yet), applies one local patch and builds
+pins it to canopy#648 at `4313b031` (the fast-blocks PR, not merged upstream yet), applies two local patches and builds
 `chain/bin/canopy`. Nothing here depends on another project.
 
 ```bash
@@ -43,13 +43,22 @@ npm start
 ```
 
 Then open http://127.0.0.1:8790. `init` makes the arcade key (`chain/.arcade-key.json`, git-ignored) and funds it in
-genesis. `localnet.sh stop`, `status`, `logs [n]` and `reset` do what they say; everything the chain writes, the plugin
+genesis. `localnet.sh stop`, `status`, `logs [n]`, `speed [seconds]` and `reset` do what they say; everything the chain writes, the plugin
 socket included, stays under `chain/data`.
 
-**The core patch** (`chain/plugin-socket-dir.patch`). Upstream, the core hard-codes the plugin socket at
+**The first patch** (`chain/plugin-socket-dir.patch`). Upstream, the core hard-codes the plugin socket at
 `/tmp/plugin/plugin.sock`, so two plugin chains on one machine collide. The patch reads the folder from
 `CANOPY_PLUGIN_SOCKET_DIR` (default unchanged); the plugin and `pluginctl.sh` read the same variable. It touches no
 consensus code.
+
+**The second patch** (`chain/commit-race.patch`). A consensus message reads state without the controller lock, and a
+commit can reset that state mid-read (`panic: pebble: closed`). At 500ms it is rare; at fast block times it crashes the
+node within minutes. The patch takes the lock for that one read. It touches no consensus rules.
+
+**Block time.** `init` paces blocks at 500ms (`roundRobinBlockIntervalMS`), which the game is tuned for.
+`BLOCK_INTERVAL_MS=<ms> chain/localnet.sh init` picks another (on a fresh chain), and `localnet.sh speed` measures it.
+With the plugin, the floor is about 40ms (real blocks every 41-50ms); below that, rounds time out and the chain slows
+down.
 
 If the chain can't be reached, the page falls back to local 500ms practice blocks and says so; practice runs aren't sealed.
 
@@ -102,11 +111,12 @@ node once per 100ms and pushes each block (height, hash, time) to every player o
 - **Controls.** Move with the mouse, a finger (drag anywhere) or the arrows/WASD. Fire is automatic. Bomb with Space or
   right-click (the BOMB button on phones). P pauses, M mutes.
 - **Breaches.** An invader that reaches the bottom costs a life, as does a hit. A hit also drops one weapon level.
-- **Waves.** Every 30 blocks (15 seconds) a new tier starts: zigzags, then gunners, splitters, tanks, divers and weavers
-  join. Invaders get 25% tougher and 6% faster per tier, and fire more often.
+- **Waves.** Every 24 blocks (12 seconds) a new tier starts: zigzags, then gunners, splitters, tanks, divers and weavers
+  join. Invaders get 35% tougher and 8% faster per tier, and fire more often and faster; from wave 7 gunners fire in
+  pairs. Divers wind up for less time before they dive.
 - **Century boss.** On any block whose height ends in 00, a mothership arrives instead (not in a run's first 10
-  seconds). It escapes after 20 seconds.
-- **Power chips** drop from invaders, chosen by the block hash:
+  seconds). It gets 15 more hit points per tier, fires faster and in wider fans, and escapes after 40 seconds.
+- **Power chips** drop from about 1 invader in 6, chosen by the block hash (P from about 1 in 12):
 
 | Chip | Effect |
 |---|---|
@@ -114,7 +124,7 @@ node once per 100ms and pushes each block (height, hash, time) to every player o
 | R | Rapid fire for 8 seconds |
 | S | A shield that takes one hit |
 | B | One more bomb (up to 3) |
-| H | One more life (up to 5) |
+| H | One more life (up to 4) |
 
 ### Multiplier
 

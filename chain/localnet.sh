@@ -1,7 +1,8 @@
 #!/bin/bash
-# Block Barrage localnet: one chain (id 2, its own root), 500ms blocks, the barrage plugin. Uses this project's own
-# core build (chain/setup.sh) and keeps everything, plugin socket included, under chain/data.
-# Usage: chain/localnet.sh {init|start|stop|status|logs [n]|reset}
+# Block Barrage localnet: one chain (id 2, its own root), 500ms round-robin blocks, the barrage plugin. Uses this
+# project's own core build (chain/setup.sh) and keeps everything, plugin socket included, under chain/data.
+# Usage: chain/localnet.sh {init|start|stop|status|logs [n]|speed [seconds]|reset}
+#   init takes BLOCK_INTERVAL_MS (default 500) and LEAD_MS (default 175); see make-chain.py.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,8 +14,10 @@ KEY="$HERE/.arcade-key.json"
 PW_FILE="$HERE/.localnet-password"
 LOG="$DATA/node.log"
 export CANOPY_PLUGIN_SOCKET_DIR="$DATA/plugin"
+RPC=http://127.0.0.1:31002
 
 arcade() { python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['address'])" "$KEY"; }
+height() { curl -sf -X POST "$RPC/v1/query/height" -d '{}' | python3 -c 'import json,sys;print(json.load(sys.stdin)["height"])'; }
 node_pids() { pgrep -f "$BIN --data-dir $DATA" || true; }
 
 ensure() {
@@ -51,18 +54,22 @@ case "${1:-}" in
         run_node
         for _ in $(seq 1 60); do grep -q "keystore" "$LOG" 2>/dev/null && [ -f "$DATA/genesis.json" ] && break; sleep 1; done
         sleep 3; stop_node
-        python3 "$HERE/make-chain.py" "$DATA" "$(arcade)"
+        python3 "$HERE/make-chain.py" "$DATA" "$(arcade)" "${BLOCK_INTERVAL_MS:-500}" "${LEAD_MS:-175}"
         # the first boot already built state from the default genesis: start from the edited one
         rm -rf "$DATA/canopy" "$DATA/logs" "$LOG"
         ;;
     start)
         ensure; run_node
-        for _ in $(seq 1 60); do curl -sf -X POST http://127.0.0.1:31002/v1/query/height -d '{}' >/dev/null && break; sleep 1; done
-        echo "chain 2: http://127.0.0.1:31002 · plugin RPC: http://127.0.0.1:31010 · log: $LOG"
+        for _ in $(seq 1 60); do height >/dev/null 2>&1 && break; sleep 1; done
+        echo "chain 2: $RPC · plugin RPC: http://127.0.0.1:31010 · log: $LOG"
         ;;
     stop) stop_node; echo stopped ;;
-    status) p="$(node_pids)"; [ -n "$p" ] && echo "running pid $p" || echo "not running" ;;
+    status) p="$(node_pids)"; [ -n "$p" ] && echo "running pid $p, height $(height 2>/dev/null || echo ?)" || echo "not running" ;;
     logs) sed 's/\x1b\[[0-9;]*m//g' "$LOG" | tail -n "${2:-40}" ;;
+    speed)
+        s="${2:-10}"; a="$(height)"; sleep "$s"; b="$(height)"
+        python3 -c "import sys;n=int(sys.argv[2])-int(sys.argv[1]);t=float(sys.argv[3]);print(f'{n} blocks in {t:g}s: {n/t:.1f} blocks/s, {1000*t/max(n,1):.1f} ms/block')" "$a" "$b" "$s"
+        ;;
     reset) stop_node; rm -rf "$DATA" ;;
-    *) echo "usage: $0 {init|start|stop|status|logs [n]|reset}"; exit 1 ;;
+    *) echo "usage: $0 {init|start|stop|status|logs [n]|speed [seconds]|reset}"; exit 1 ;;
 esac
