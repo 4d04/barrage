@@ -71,14 +71,14 @@ export function spawnFor(height, hash, n) {
   const e = ENEMIES[type];
   // toughness grows 35% per tier, so the weapon upgrades stay necessary; divers stay fragile (they ram you)
   const hp = century ? e.hp + 15 * tier : type === 'diver' ? e.hp + Math.floor(tier / 4) : Math.round(e.hp * (1 + 0.35 * tier));
-  // drops: P power chip, S shield, R rapid fire, B bomb, H extra life
+  // drops: P power chip, S shield, R rapid fire, N homing nuke, H extra life
   const r = b[2];
   let drop = null;
   if (century) drop = 'P';
   else if (r < 22) drop = 'P';
   else if (r < 31) drop = 'R';
   else if (r < 38) drop = 'S';
-  else if (r < 43) drop = 'B';
+  else if (r < 43) drop = 'N';
   else if (r < 46) drop = 'H';
   return {
     type, height, tier, hp,

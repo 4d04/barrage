@@ -141,7 +141,7 @@ SPR.century = [0, 1].map((f) => {
 });
 const PICK = {
   P: { color: C.gold, label: 'P' }, R: { color: C.lime, label: 'R' }, S: { color: C.cyan, label: 'S' },
-  B: { color: C.orange, label: 'B' }, H: { color: C.pink, label: 'H' },
+  N: { color: C.orange, label: 'N' }, H: { color: C.pink, label: 'H' },
 };
 
 // ---------- sound (square-wave beeps and noise) ----------
@@ -236,15 +236,20 @@ function avgBlockMs() { const iv = feed.intervals; return iv.length ? iv.reduce(
 
 // ---------- side panel ----------
 const RAIL_N = 14;
+// a cursor sweeps left to right, one cell per block, and wraps back to the left when it reaches the end
+let railPos = -1;
 function railPush(b) {
   $('tip').textContent = `#${fmt(b.h)}`;
   const avg = avgBlockMs();
   if (avg) { $('avgms').textContent = `${Math.round(avg)}ms`; $('hdrms').textContent = `${Math.round(avg)}ms`; }
   const rail = $('rail');
-  const i = document.createElement('i'); i.className = 'new'; i.title = `#${b.h}${b.hash ? ' ' + b.hash.slice(0, 12) : ''}`;
-  rail.appendChild(i);
-  setTimeout(() => i.classList.remove('new'), 250);
-  while (rail.children.length > RAIL_N) rail.firstChild.remove();
+  if (rail.children.length !== RAIL_N) { rail.textContent = ''; for (let k = 0; k < RAIL_N; k++) rail.appendChild(document.createElement('i')); }
+  railPos = (railPos + 1) % RAIL_N;
+  const cells = rail.children;
+  if (railPos === 0) for (const c of cells) c.className = '';
+  else cells[railPos - 1].className = 'on';
+  const i = cells[railPos];
+  i.className = 'new'; i.title = `#${b.h}${b.hash ? ' ' + b.hash.slice(0, 12) : ''}`;
 }
 function setMode() {
   $('mode').textContent = feed.live ? 'live' : 'practice blocks';
@@ -312,12 +317,12 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 
 // ---------- game state ----------
 let state = 'title', paused = false, clock = 0, shake = 0, flash = 0, flashColor = C.white, hiScore = 0;
-let player, enemies, bullets, ebullets, pickups, particles, popups, banners, beams, toasts, run;
+let player, enemies, bullets, ebullets, pickups, particles, popups, banners, beams, toasts, nukes, blasts, run;
 const stars = Array.from({ length: 70 }, (_, i) => ({ x: Math.random() * W, y: Math.random() * H, z: 1 + (i % 3) }));
 
 function reset() {
   player = { x: W / 2, y: BOTTOM - 14, lives: 3, power: 1, bombs: 1, shield: 0, rapid: 0, invuln: 0, fireCd: 0, missileCd: 0 };
-  enemies = []; bullets = []; ebullets = []; pickups = []; particles = []; popups = []; banners = []; beams = []; toasts = [];
+  enemies = []; bullets = []; ebullets = []; pickups = []; particles = []; popups = []; banners = []; beams = []; toasts = []; nukes = []; blasts = [];
   run = {
     id: null, startHeight: feed.tip, lastHeight: feed.tip, practice: !feed.live, score: 0, kills: 0,
     mult: 1, charge: 0, bestMult: 1, blocksSinceKill: 0, combo: 0, burstAt: -1, burst: 0, cleanBlocks: 0, milestone: 0,
@@ -504,14 +509,120 @@ function hurt(reason) {
   if (player.lives <= 0) gameOver();
 }
 
+// The bomb is a heat-seeking nuke: it locks onto the toughest invader on screen, chases it, and detonates on
+// contact (or when its fuel runs out), wrecking everything inside the blast and erasing nearby enemy fire.
+const NUKE = { speed: 210, turn: 5, fuel: 2.2, radius: 38, dmg: 14, wipe: 52 };
+function nukeTarget(n) {
+  let best = null, score = -1e9;
+  for (const e of enemies) {
+    if (e.dead || e.y < TOP - 4) continue;
+    const s = e.hp * 10 + (isBoss(e) ? 1000 : 0) - Math.hypot(e.x - n.x, e.y - n.y) * 0.2;
+    if (s > score) { score = s; best = e; }
+  }
+  return best;
+}
 function bomb() {
   if (paused || player.bombs <= 0) return;
   player.bombs--;
-  ebullets = [];
-  flash = 0.4; flashColor = C.white; shake = 7;
-  SFX.bomb();
-  for (const e of enemies) if (e.y > TOP - 4) damage(e, 10);
-  popup('BOMB!', player.x, player.y - 12, C.orange);
+  const n = { x: player.x, y: player.y - 6, vx: 0, vy: -90, t: 0, target: null };
+  n.target = nukeTarget(n);
+  nukes.push(n);
+  SFX.bomb(); shake = 2;
+  popup('NUKE AWAY', player.x, player.y - 12, C.orange);
+}
+function detonate(n) {
+  n.spent = true;
+  // the main fireball, then a few smaller pops scattered inside the blast
+  blasts.push({ x: n.x, y: n.y, t: 0, life: 1.1, r: NUKE.radius, seed: Math.random() * 1000, main: true });
+  for (let k = 0; k < 5; k++) {
+    const a = Math.random() * Math.PI * 2, d = NUKE.radius * (0.35 + Math.random() * 0.5);
+    blasts.push({ x: n.x + Math.cos(a) * d, y: n.y + Math.sin(a) * d, t: -0.06 - k * 0.06, life: 0.5, r: 9 + Math.random() * 6, seed: Math.random() * 1000 });
+  }
+  flash = 0.35; flashColor = C.white; shake = 10;
+  SFX.bomb(); setTimeout(() => SFX.bomb(), 90);
+  burst(n.x, n.y, C.white, 20, 160); burst(n.x, n.y, C.gold, 36, 120); burst(n.x, n.y, C.orange, 36, 90); burst(n.x, n.y, C.red, 20, 60);
+  // smoke that drifts up after the fire burns out
+  for (let k = 0; k < 18; k++) {
+    const a = Math.random() * Math.PI * 2, d = Math.random() * NUKE.radius * 0.7;
+    particles.push({ x: n.x + Math.cos(a) * d, y: n.y + Math.sin(a) * d, vx: (Math.random() - 0.5) * 12, vy: -10 - Math.random() * 14, t: 0, life: 0.9 + Math.random() * 0.8, color: Math.random() < 0.5 ? C.navy : C.grey });
+  }
+  ebullets = ebullets.filter((b) => Math.hypot(b.x - n.x, b.y - n.y) > NUKE.wipe);
+  for (const e of enemies) {
+    if (e.dead) continue;
+    // a hit anywhere on the body counts, so big invaders aren't safe just because their middle is far away
+    const dx = Math.max(0, Math.abs(e.x - n.x) - e.w / 2), dy = Math.max(0, Math.abs(e.y - n.y) - e.h / 2);
+    if (Math.hypot(dx, dy) <= NUKE.radius) damage(e, NUKE.dmg);
+  }
+}
+function updateNukes(dt) {
+  for (const n of nukes) {
+    n.t += dt;
+    if (!n.target || n.target.dead) n.target = nukeTarget(n);
+    const speed = NUKE.speed * Math.min(1, 0.4 + n.t * 2); // a slow launch, then it opens up
+    if (n.target) {
+      const a = Math.atan2(n.target.y - n.y, n.target.x - n.x);
+      const k = Math.min(1, NUKE.turn * dt);
+      n.vx += (Math.cos(a) * speed - n.vx) * k; n.vy += (Math.sin(a) * speed - n.vy) * k;
+    } else { n.vx *= 1 - 2 * dt; n.vy += (-speed - n.vy) * Math.min(1, 3 * dt); }
+    n.x += n.vx * dt; n.y += n.vy * dt;
+    // exhaust
+    if (Math.random() < 0.9) particles.push({ x: n.x - n.vx * 0.03, y: n.y - n.vy * 0.03, vx: (Math.random() - 0.5) * 20, vy: (Math.random() - 0.5) * 20, t: 0, life: 0.35, color: Math.random() < 0.5 ? C.gold : C.navy });
+    const hit = enemies.some((e) => !e.dead && Math.abs(e.x - n.x) < e.w / 2 + 2 && Math.abs(e.y - n.y) < e.h / 2 + 2);
+    if (hit || n.t > NUKE.fuel || n.y < TOP + 4 || n.x < 2 || n.x > W - 2) detonate(n);
+  }
+  nukes = nukes.filter((n) => !n.spent);
+  for (const b of blasts) b.t += dt;
+  blasts = blasts.filter((b) => b.t < b.life);
+}
+// cheap per-pixel noise, so the fireball's edge boils instead of being a clean circle
+const boil = (x, y, s) => { const v = Math.sin(x * 12.9898 + y * 78.233 + s) * 43758.5453; return v - Math.floor(v); };
+const FIRE = [C.white, '#fff6b0', C.gold, C.orange, C.red, '#8a2a4a'];
+function drawBlast(b) {
+  const k = b.t / b.life;
+  // grows fast, then burns down from the outside in
+  const r = b.r * (k < 0.25 ? 0.4 + 2.4 * k : 1 - 0.55 * (k - 0.25));
+  const heat = k * 1.6; // 0 white-hot, later cooling to red
+  const flick = Math.floor(clock * 20);
+  for (let y = -r; y <= r; y += 2) {
+    for (let x = -r; x <= r; x += 2) {
+      const d = Math.hypot(x, y) / r, n = boil(Math.round(x / 2), Math.round(y / 2), b.seed + flick);
+      if (d + n * 0.35 > 1.05) continue;
+      // hotter in the middle, cooler at the rim and with age
+      const i = Math.min(FIRE.length - 1, Math.max(0, Math.floor((d * 2.2 + heat * 2.6 + n * 0.8))));
+      if (k > 0.6 && n < (k - 0.6) * 2.2) continue; // it breaks up as it dies
+      ctx.fillStyle = FIRE[i];
+      ctx.fillRect(Math.round(b.x + x), Math.round(b.y + y), 2, 2);
+    }
+  }
+  if (b.main) {
+    // the shockwave runs out past the fireball, and a white core flash at the very start
+    const sr = b.r * (0.5 + k * 1.6);
+    ctx.globalAlpha = Math.max(0, 1 - k * 1.4);
+    ctx.lineWidth = 2; ctx.strokeStyle = C.white; ctx.beginPath(); ctx.arc(b.x, b.y, sr, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 1; ctx.strokeStyle = C.cyan; ctx.beginPath(); ctx.arc(b.x, b.y, sr * 0.82, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+    if (k < 0.08) { ctx.fillStyle = C.white; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 0.7, 0, Math.PI * 2); ctx.fill(); }
+  }
+}
+function drawNukes() {
+  for (const b of blasts) if (b.t >= 0) drawBlast(b);
+  for (const n of nukes) {
+    // lock-on brackets around the target
+    const t = n.target;
+    if (t && !t.dead && Math.floor(clock * 10) % 2) {
+      const hw = t.w / 2 + 3, hh = t.h / 2 + 3, x0 = Math.round(t.x - hw), y0 = Math.round(t.y - hh), x1 = Math.round(t.x + hw), y1 = Math.round(t.y + hh);
+      ctx.fillStyle = C.red;
+      for (const [x, y, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) { ctx.fillRect(Math.min(x, x + sx * 3), y, 4, 1); ctx.fillRect(x, Math.min(y, y + sy * 3), 1, 4); }
+    }
+    // the missile: a body along its heading, a hot nose
+    const a = Math.atan2(n.vy, n.vx);
+    ctx.save(); ctx.translate(Math.round(n.x), Math.round(n.y)); ctx.rotate(a);
+    ctx.fillStyle = C.white; ctx.fillRect(-4, -1.5, 7, 3);
+    ctx.fillStyle = C.red; ctx.fillRect(3, -1, 2, 2);
+    ctx.fillStyle = C.orange; ctx.fillRect(-5, -2.5, 2, 5);
+    ctx.fillStyle = Math.floor(clock * 30) % 2 ? C.gold : C.white; ctx.fillRect(-7, -1, 2, 2);
+    ctx.restore();
+  }
 }
 
 function collect(p) {
@@ -523,7 +634,7 @@ function collect(p) {
       break;
     case 'R': player.rapid = 8; popup('RAPID FIRE', p.x, p.y - 6, C.lime); break;
     case 'S': player.shield = 1; popup('SHIELD', p.x, p.y - 6, C.cyan); break;
-    case 'B': player.bombs = Math.min(3, player.bombs + 1); popup('+BOMB', p.x, p.y - 6, C.orange); break;
+    case 'N': player.bombs = Math.min(3, player.bombs + 1); popup('+NUKE', p.x, p.y - 6, C.orange); break;
     case 'H': if (player.lives < 4) { player.lives++; popup('+LIFE', p.x, p.y - 6, C.pink); } else feat('MAXED', FEATS.maxedPickup, 0, p.x, p.y - 6); break;
   }
 }
@@ -681,6 +792,7 @@ function update(dt) {
   bullets = bullets.filter((b) => b.y > TOP - 6 && b.y < H + 4 && b.x > -4 && b.x < W + 4 && !b.spent);
 
   for (const e of enemies) if (!e.dead) updateEnemy(e, dt);
+  updateNukes(dt);
 
   // player bullets vs invaders
   for (const b of bullets) {
@@ -758,6 +870,7 @@ function draw() {
       if (player.shield) { ctx.strokeStyle = Math.floor(clock * 6) % 2 ? C.cyan : C.white; ctx.strokeRect(Math.round(player.x) - 8.5, Math.round(player.y) - 7.5, 17, 15); }
     }
     for (const p of particles) { ctx.fillStyle = p.color; ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); }
+    drawNukes();
     for (const p of popups) { if (p.t > p.life * 0.7 && Math.floor(p.t * 20) % 2) continue; drawTextC(p.text, Math.max(textWidth(p.text) / 2 + 1, Math.min(W - textWidth(p.text) / 2 - 1, p.x)), Math.round(p.y), p.color, p.k); }
   }
   ctx.restore();
@@ -799,7 +912,7 @@ function drawHud() {
   drawText(WEAPON_NAMES[player.power], 36, BOTTOM + 3, C.gold, 1, null);
   if (player.rapid > 0) drawText('RAPID', 76, BOTTOM + 3, C.lime, 1, null);
   for (let i = 0; i < player.bombs; i++) { ctx.fillStyle = C.orange; ctx.fillRect(W - 6 - i * 6, BOTTOM + 3, 4, 4); }
-  drawTextR('BOMB', W - 22, BOTTOM + 3, player.bombs ? C.orange : C.navy, 1, null);
+  drawTextR('NUKE', W - 22, BOTTOM + 3, player.bombs ? C.orange : C.navy, 1, null);
 }
 
 // ---------- game over and sealing ----------
@@ -874,4 +987,4 @@ loadBoard();
 setInterval(loadBoard, 15000);
 requestAnimationFrame(frame);
 // for the dev console and tests
-window.__barrage = { tick(dt) { update(dt); draw(); }, resume() { paused = false; }, get state() { return state; }, get run() { return run; }, get player() { return player; }, get enemies() { return enemies; }, steer(p) { pointer = p; }, start, feed, TIER_BLOCKS };
+window.__barrage = { tick(dt) { update(dt); draw(); }, resume() { paused = false; }, get state() { return state; }, get run() { return run; }, get player() { return player; }, get enemies() { return enemies; }, steer(p) { pointer = p; }, start, bomb, get nukes() { return nukes; }, get blasts() { return blasts; }, feed, TIER_BLOCKS };

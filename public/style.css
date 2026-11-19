@@ -49,6 +49,7 @@
   .chainline b { color: var(--text); font-weight: normal; }
   .rail { display: flex; gap: 3px; margin: 10px 0 4px; height: 14px; overflow: hidden; }
   .rail i { flex: 0 0 14px; height: 14px; background: #2a2a8a; }
+  .rail i.on { background: #3a5ab0; }
   .rail i.new { background: var(--cyan); }
   .feed { font-size: 8px; line-height: 1.9; color: var(--muted); }
   .feed div:first-child { color: var(--lime); }

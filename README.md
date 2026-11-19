@@ -112,8 +112,8 @@ node once per 100ms and pushes each block (height, hash, time) to every player o
 
 ## How it plays
 
-- **Controls.** Move with the mouse, a finger (drag anywhere) or the arrows/WASD. Fire is automatic. Bomb with Space or
-  right-click (the BOMB button on phones). P pauses, M mutes.
+- **Controls.** Move with the mouse, a finger (drag anywhere) or the arrows/WASD. Fire is automatic. Launch a nuke with Space
+  or right-click (the NUKE button on phones). P pauses, M mutes.
 - **Breaches.** An invader that reaches the bottom costs a life, as does a hit. A hit also drops one weapon level.
 - **Waves.** The run opens with drones and zigzags, and the drones shoot: a slow aimed shot every few seconds, with a
   white blink just before it. Every 24 blocks (12 seconds) a new tier starts: gunners, then splitters, tanks, divers and
@@ -123,6 +123,9 @@ node once per 100ms and pushes each block (height, hash, time) to every player o
   labelled with its height. It hovers at the top, fires aimed shots (it blinks just before) and every third volley a
   fan, and it stays until you take it out, while the blocks keep bringing invaders. Killing it pays 500 points plus a
   300 bonus and drops a weapon upgrade.
+- **Nukes.** You start with one. A nuke is a heat-seeking missile: it locks onto the toughest invader on screen (a boss
+  if there is one), chases it and detonates on contact, hitting everything within its blast for 14 damage and erasing
+  enemy fire nearby. It is not a screen clear, so aim it with your position and timing.
 - **Century boss.** On any block whose height ends in 00, a mothership arrives instead (not in a run's first 10
   seconds). It gets 15 more hit points per tier, fires faster and in wider fans, and escapes after 40 seconds.
 - **Power chips** drop from about 1 invader in 6, chosen by the block hash (P from about 1 in 12):
@@ -132,7 +135,7 @@ node once per 100ms and pushes each block (height, hash, time) to every player o
 | P | Weapon up: BLASTER, TWIN, TWIN+, SPREAD, WINGS, LASER, FAN, SWARM (homing missiles) |
 | R | Rapid fire for 8 seconds |
 | S | A shield that takes one hit |
-| B | One more bomb (up to 3) |
+| N | One more homing nuke (up to 3) |
 | H | One more life (up to 4) |
 
 ### Multiplier
@@ -144,7 +147,7 @@ seconds of sharp play, and x32 takes minutes of near-perfect play.
 | Feat | When | Charge | Bonus |
 |---|---|---|---|
 | FINALITY | Kill an invader before the next block lands | 1 | 25 |
-| DOUBLE / TRIPLE / MEGA KILL | 2, 3 or 5 kills within 150ms (spreads, lasers, bombs) | 1 / 2 / 3 | 50 / 100 / 200 |
+| DOUBLE / TRIPLE / MEGA KILL | 2, 3 or 5 kills within 150ms (spreads, lasers, nukes) | 1 / 2 / 3 | 50 / 100 / 200 |
 | COMBO | Every 8 kills without the multiplier cooling | 2 | 100 |
 | UNBROKEN CHAIN | Every 40 blocks without getting hit | 4 | 200 |
 | CENTURY DOWN | Destroy the century boss | 8 | 500 |
