@@ -56,6 +56,10 @@ LockPersonality=yes
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
 SystemCallFilter=~@privileged
+# the core's log rotator chowns each new log file to its own user (harmless: the unit holds no capabilities)
+SystemCallFilter=@chown
+# a call outside the filter fails with an error instead of killing the process
+SystemCallErrorNumber=EPERM
 ReadWritePaths=/opt/barrage/data/game
 InaccessiblePaths=-/opt/barrage/secrets
 
