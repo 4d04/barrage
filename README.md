@@ -4,6 +4,8 @@ An 8-bit fixed shooter on its own Canopy chain. The chain makes a block every 50
 invader**, labelled with its block height. Shoot them down before they reach the bottom. Waves get tougher every 12
 seconds, power chips upgrade your ship, and the high-score board lives on the chain.
 
+**Play it at https://blockbarrage.canopynetwork.org.**
+
 There's no sign-in and no wallet. Open the page, click, play. When you seal a score, the arcade server signs a
 `submit_score` transaction with its own key, and it lands in a block about a second later.
 
@@ -193,8 +195,10 @@ Then, as root:
    `(umask 077; openssl rand -hex 32 > /opt/barrage/secrets/keystore-password)`, then
    `node server/keygen.js /opt/barrage/secrets/arcade-key.json`, which prints the arcade address.
 4. Write `BARRAGE_ARCADE_AUTHORITY=<arcade address>` to `/opt/barrage/barrage.env`.
-5. `install -d -o barrage-chain -g barrage-chain -m 700 /opt/barrage/data /opt/barrage/data/game`, then first-boot the
-   node as `barrage-chain` into `data/game` with that password, and stop it.
+5. `install -d -o barrage-chain -g barrage-chain -m 700 /opt/barrage/data /opt/barrage/data/game /opt/barrage/data/game/plugin`,
+   then first-boot the node as `barrage-chain` from `app/chain/canopy`, and stop it once `config.json`, `keystore.json`
+   and `genesis.json` exist (`runuser` is in `/usr/sbin`):
+   `runuser -u barrage-chain -- env CANOPY_DATA_DIR=/opt/barrage/data/game /opt/barrage/app/chain/bin/canopy --data-dir /opt/barrage/data/game --password "$(cat /opt/barrage/secrets/keystore-password)" --nickname barrage start`
 6. Run `chain/make-chain.py /opt/barrage/data/game <arcade address>` and delete `data/game/canopy` so the edited genesis
    applies. Make sure the files are still owned by `barrage-chain`.
 7. Install both units and the Caddy snippet (with your domain), then start `barrage-game` and `barrage-web`.
@@ -203,7 +207,36 @@ Then, as root:
 The chain grows by about 240 MB a day at 500ms, so watch the disk. Top up the arcade key if `/barrage/arcade` runs low:
 it starts with enough for 100 million scores.
 
-This setup has not been run on a server yet.
+### The live server
+
+https://blockbarrage.canopynetwork.org runs this setup on one Ubuntu 26.04 server (`ssh root@2.29.137.199`, 2 cores,
+3.7 GB), deployed on 2026-11-19. Caddy there also serves abbey.skylabs.ventures; the Barrage block is at the end of
+`/etc/caddy/Caddyfile`, and the `Caddyfile.bak-*` files next to it are the versions before each change. The block feed
+must not be compressed (`encode` skips `/api/blocks`): compressed, it reaches browsers in bursts and the game falls back
+to practice blocks.
+
+Ship a change (from a clean checkout of what is on GitHub):
+
+```bash
+git archive HEAD | ssh root@2.29.137.199 'tar -x -C /opt/barrage/app && chown -R root:root /opt/barrage/app'
+```
+
+```bash
+ssh root@2.29.137.199 'cd /opt/barrage/app && export PATH=/opt/node/bin:/usr/bin:/bin && npm ci --omit=dev && (cd plugin && npm ci && npm run build:all && npm prune --omit=dev) && systemctl restart barrage-web'
+```
+
+A rules or plugin change also needs `systemctl restart barrage-game`, and one that changes the score ceiling needs a
+fresh chain. To start the chain over (this empties the board):
+
+```bash
+ssh root@2.29.137.199 'systemctl stop barrage-web barrage-game && rm -rf /opt/barrage/data/game/canopy /opt/barrage/data/game/logs && systemctl start barrage-game && sleep 5 && systemctl start barrage-web'
+```
+
+Look at it:
+
+```bash
+ssh root@2.29.137.199 'systemctl status barrage-game barrage-web --no-pager | grep -E "●|Active"; du -sh /opt/barrage/data/game'
+```
 
 ## Security
 
