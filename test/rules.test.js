@@ -20,6 +20,11 @@ test('the ceiling covers the most a block can pay: boss kill, drop, and every fe
   }
 });
 
+test('the ceiling covers taking out the Blockmonster in a run\'s first block', () => {
+  const best = (ENEMIES.blockmonster.pts + FEATS.blockmonster + FEATS.finality + FEATS.mega + FEATS.combo + FEATS.unbroken + FEATS.maxedPickup + ENEMIES.drone.pts) * MAX_MULT;
+  assert.ok(maxScore(1) >= best);
+});
+
 test('the same block always spawns the same invader', () => {
   assert.deepEqual(spawnFor(4821, HASH, 50), spawnFor(4821, HASH, 50));
   const kinds = new Set();
@@ -28,9 +33,12 @@ test('the same block always spawns the same invader', () => {
 });
 
 test('invaders unlock by tier, and blocks ending in 00 bring the century boss', () => {
-  for (let h = 1; h < 300; h++) if (h % 100) assert.equal(spawnFor(h, null, 5).type, 'drone');
+  const first = new Set();
+  for (let h = 1; h < 300; h++) if (h % 50) first.add(spawnFor(h, null, 5).type);
+  assert.deepEqual([...first].sort(), ['drone', 'zigzag'], 'wave 1 is drones and zigzags');
   assert.equal(spawnFor(4800, HASH, 25).type, 'century');
   assert.notEqual(spawnFor(4800, HASH, 5).type, 'century', 'no boss in the first 10 seconds');
+  assert.notEqual(spawnFor(4850, HASH, 30).type, 'century', 'only blocks ending in 00');
   const late = new Set();
   for (let h = 1; h <= 2000; h++) if (h % 100) late.add(spawnFor(h, null, 200).type);
   assert.deepEqual([...late].sort(), ['diver', 'drone', 'gunner', 'splitter', 'tank', 'weaver', 'zigzag']);

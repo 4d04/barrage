@@ -95,6 +95,29 @@ const SPR = {
     sprite(['....ppppp....', '..ppwwpwwpp..', '.ppwkkpkkwpp.', 'ppppppppppppp', 'pLpLpLpLpLpLp', '.p.p.p.p.p.p.', '..p.p...p.p..', '..p..p.p..p..', '.p.........p.'], { p: C.pink, w: C.white, k: C.ink, L: C.purple }),
   ],
 };
+// the Blockmonster, drawn procedurally: a living block with big eyes, teeth and stomping feet
+SPR.blockmonster = [0, 1].map((f) => {
+  const rows = [];
+  for (let y = 0; y < 18; y++) {
+    let r = '';
+    for (let x = 0; x < 26; x++) {
+      let ch = '.';
+      const body = x >= 3 && x <= 22 && y >= 1 && y <= 13;
+      if (body) ch = x === 3 || x === 22 || y === 1 || y === 13 ? 'o' : (x + y) % 6 === 0 ? 'l' : 'p';
+      if (y === 0 && (x === 6 || x === 7 || x === 18 || x === 19)) ch = 'o'; // horns
+      if ((x === 1 || x === 2 || x === 23 || x === 24) && y === (f ? 6 : 8)) ch = 'o'; // arms
+      if ((x >= 6 && x <= 10 || x >= 15 && x <= 19) && y >= 3 && y <= 7) ch = 'w';
+      const look = f ? 1 : 0;
+      if ((x === 8 + look || x === 17 + look) && (y === 5 || y === 6)) ch = 'k';
+      if (y >= 10 && y <= 11 && x >= 6 && x <= 19) ch = (x + y) % 2 ? 'w' : 'k';
+      const step = f ? [5, 6, 17, 18] : [7, 8, 19, 20];
+      if (y >= 14 && step.includes(x)) ch = y === 17 ? 'k' : 'o';
+      r += ch;
+    }
+    rows.push(r);
+  }
+  return sprite(rows, { o: C.purple, p: C.pink, l: C.purple, w: C.white, k: C.ink });
+});
 // the century mothership, drawn procedurally: a gold saucer with a row of lights that read "00"
 SPR.century = [0, 1].map((f) => {
   const rows = [];
@@ -309,8 +332,11 @@ async function start() {
   reset();
   state = 'play'; paused = false;
   $('title').hidden = true; $('over').hidden = true;
-  banner('WAVE 1', 'DRONES INBOUND', C.cyan);
-  SFX.tier();
+  // the Blockmonster: born from the block this run starts on, already on screen
+  const h0 = feed.tip || 0, m = ENEMIES.blockmonster;
+  spawn({ type: 'blockmonster', height: h0, tier: 0, hp: m.hp, x: 0.5, speed: 1, pts: m.pts, drop: 'P', dir: h0 % 2 ? 1 : -1, phase: 0.4, hash: null });
+  banner('BLOCKMONSTER', 'TAKE IT DOWN', C.pink, 2.2);
+  banner('WAVE 1', 'DRONES AND ZIGZAGS', C.cyan);
   if (feed.live && feed.ranked) {
     try {
       const r = await fetch('/api/run', { method: 'POST' });
@@ -328,7 +354,7 @@ function togglePause() {
 }
 
 // ---------- spawning: one invader per block ----------
-const UNLOCK_TEXT = ['DRONES INBOUND', 'ZIGZAGS INBOUND', 'GUNNERS INBOUND', 'SPLITTERS INBOUND', 'TANKS INBOUND', 'DIVERS INBOUND', 'WEAVERS INBOUND'];
+const UNLOCK_TEXT = ['DRONES AND ZIGZAGS', 'GUNNERS INBOUND', 'SPLITTERS INBOUND', 'TANKS INBOUND', 'DIVERS INBOUND', 'WEAVERS INBOUND'];
 function gameBlock(b) {
   if (state !== 'play') return;
   if (b.h <= run.lastHeight) return;
@@ -358,14 +384,16 @@ function gameBlock(b) {
 
 function spawn(s) {
   const def = ENEMIES[s.type];
-  const x = s.type === 'century' ? W / 2 : Math.round(s.x * (W - def.w)) + def.w / 2;
-  const y = s.type === 'century' ? TOP + 12 : TOP + 8 + Math.round(s.phase * 50);
+  const boss = isBoss(s);
+  const x = boss ? W / 2 : Math.round(s.x * (W - def.w)) + def.w / 2;
+  const y = boss ? TOP + 14 : TOP + 8 + Math.round(s.phase * 50);
   const e = {
     ...s, x, y, w: def.w, h: def.h, maxHp: s.hp, t: 0, flash: 0, vx: 0, vy: 0, fireCd: 1 + s.phase * 1.5,
     state: 0, anchorX: x, born: clock, label: String(s.height).slice(-4),
   };
   if (s.type === 'zigzag') e.vx = 46 * s.speed * s.dir;
   if (s.type === 'century') { e.vx = 30 * s.dir; e.life = 40; banner('CENTURY BLOCK', `#${s.height}`, C.gold); SFX.milestone(); }
+  if (s.type === 'blockmonster') { e.vx = 22 * s.dir; e.fireCd = 2.2; e.volley = 0; SFX.milestone(); }
   enemies.push(e);
   beams.push({ x, y, t: 0.12 });
 }
@@ -429,6 +457,11 @@ function kill(e) {
   else if (run.burst === 5) feat('MEGA KILL', FEATS.mega, CHARGE.mega, e.x, e.y + 2, C.pink);
   run.combo++;
   if (run.combo % 8 === 0) feat(`COMBO ${run.combo}`, FEATS.combo, CHARGE.combo, e.x, e.y + 8, C.orange);
+  if (e.type === 'blockmonster') {
+    feat('BLOCKMONSTER DOWN!', FEATS.blockmonster, CHARGE.century, e.x, e.y + 12, C.pink);
+    banner('MONSTER DOWN', `BLOCK #${e.height}`, C.pink);
+    shake = 8; flash = 0.3; flashColor = C.pink;
+  }
   if (e.type === 'century') {
     feat('CENTURY DOWN!', FEATS.century, CHARGE.century, e.x, e.y + 12, C.gold);
     banner('CENTURY DOWN', `BLOCK #${e.height}`, C.gold);
@@ -437,15 +470,16 @@ function kill(e) {
   const pts = e.pts * run.mult;
   run.score += pts;
   popup(fmt(pts), e.x, e.y, C.white);
-  burst(e.x, e.y, colorOf(e), e.type === 'century' ? 50 : 12, e.type === 'century' ? 110 : 60);
-  SFX.pop(e.type === 'century' || e.type === 'tank');
+  burst(e.x, e.y, colorOf(e), isBoss(e) ? 50 : 12, isBoss(e) ? 110 : 60);
+  SFX.pop(isBoss(e) || e.type === 'tank');
   if (e.type === 'splitter') {
     for (const d of [-1, 1]) enemies.push({ ...e, type: 'mini', dead: false, hp: 1, maxHp: 1, w: 6, h: 5, pts: ENEMIES.mini.pts * (1 + e.tier), vx: 40 * d, vy: 30, drop: null, x: e.x + d * 3, t: 0, flash: 0 });
   }
   if (e.drop) pickups.push({ kind: e.drop, x: e.x, y: e.y, t: 0 });
   if (e.type === 'century') pickups.push({ kind: 'H', x: e.x + 8, y: e.y, t: 0 });
 }
-const ENEMY_COLOR = { drone: C.green, zigzag: C.gold, gunner: C.red, splitter: C.purple, mini: C.pink, tank: C.orange, diver: C.cyan, weaver: C.pink, century: C.gold };
+const ENEMY_COLOR = { drone: C.green, zigzag: C.gold, gunner: C.red, splitter: C.purple, mini: C.pink, tank: C.orange, diver: C.cyan, weaver: C.pink, century: C.gold, blockmonster: C.pink };
+function isBoss(e) { return e.type === 'century' || e.type === 'blockmonster'; }
 const colorOf = (e) => ENEMY_COLOR[e.type] || C.white;
 
 function damage(e, dmg) {
@@ -520,7 +554,13 @@ function updateEnemy(e, dt) {
   const s = e.speed;
   switch (e.type) {
     case 'drone':
-      e.y += 16 * s * dt; e.x = e.anchorX + Math.sin((e.t + e.phase * 6) * 1.6) * 10;
+      e.y += 20 * s * dt; e.x = e.anchorX + Math.sin((e.t + e.phase * 6) * 1.6) * 10;
+      // a slow aimed shot every few seconds, from the first wave; it blinks white just before, so you can see it coming
+      if (e.y > TOP + 16 && e.y < player.y - 50) {
+        e.fireCd -= dt;
+        e.warn = e.fireCd < 0.4;
+        if (e.fireCd <= 0) { e.fireCd = Math.max(2.8, 4.6 - 0.12 * e.tier) + 1.5 * e.phase; e.warn = false; aimAt(e, 50 * s); }
+      } else e.warn = false;
       break;
     case 'zigzag':
       e.y += 21 * s * dt; e.x += e.vx * dt;
@@ -556,6 +596,19 @@ function updateEnemy(e, dt) {
         for (const a of [-0.35, 0, 0.35]) ebullets.push({ x: e.x, y: e.y + 4, vx: Math.sin(a) * 69 * s, vy: Math.cos(a) * 69 * s });
       }
       break;
+    case 'blockmonster':
+      // hovers and stays until it's taken out; aimed shots, every third volley a fan, a blink before each
+      e.x += e.vx * dt;
+      if (e.x < e.w / 2 + 4 || e.x > W - e.w / 2 - 4) { e.vx = -e.vx; e.x = Math.max(e.w / 2 + 4, Math.min(W - e.w / 2 - 4, e.x)); }
+      e.y = TOP + 18 + Math.sin(e.t * 1.1) * 5;
+      e.fireCd -= dt;
+      e.warn = e.fireCd < 0.45;
+      if (e.fireCd <= 0) {
+        e.volley++; e.fireCd = 1.8; e.warn = false;
+        if (e.volley % 3 === 0) for (const a of [-0.6, -0.3, 0, 0.3, 0.6]) ebullets.push({ x: e.x, y: e.y + 8, vx: Math.sin(a) * 52, vy: Math.cos(a) * 52 });
+        else aimAt(e, 60);
+      }
+      break;
     case 'century':
       e.x += e.vx * dt;
       if (e.x < e.w / 2 + 2 || e.x > W - e.w / 2 - 2) { e.vx = -e.vx; e.x = Math.max(e.w / 2 + 2, Math.min(W - e.w / 2 - 2, e.x)); }
@@ -572,7 +625,7 @@ function updateEnemy(e, dt) {
   }
   if (e.y - e.h / 2 > BOTTOM || e.x < -20 || e.x > W + 20) {
     e.dead = true; e.escaped = true;
-    if (e.y > BOTTOM - 4 && e.type !== 'century') { popup('BREACH!', Math.max(16, Math.min(W - 16, e.x)), BOTTOM - 12, C.red); hurt('breach'); }
+    if (e.y > BOTTOM - 4 && !isBoss(e)) { popup('BREACH!', Math.max(16, Math.min(W - 16, e.x)), BOTTOM - 12, C.red); hurt('breach'); }
   }
 }
 
@@ -649,7 +702,7 @@ function update(dt) {
     if (Math.abs(b.x - core.x) < 3.5 && Math.abs(b.y - core.y) < 3.5) { b.spent = true; hurt('shot'); }
   }
   ebullets = ebullets.filter((b) => !b.spent && b.y < H + 4 && b.y > -4 && b.x > -4 && b.x < W + 4);
-  for (const e of enemies) if (!e.dead && overlap(e, core, 1)) { damage(e, e.type === 'century' ? 2 : 99); hurt('ram'); }
+  for (const e of enemies) if (!e.dead && overlap(e, core, 1)) { damage(e, isBoss(e) ? 2 : 99); hurt('ram'); }
   enemies = enemies.filter((e) => !e.dead);
 
   for (const p of pickups) {
@@ -682,13 +735,13 @@ function draw() {
       const frames = SPR[e.type];
       const f = frames[Math.floor((clock + e.phase) * 3) % frames.length];
       if (e.type === 'diver' && e.state === 1 && Math.floor(e.t * 10) % 2) continue;
-      drawSprite(f, e.x, e.y, e.flash > 0);
+      drawSprite(f, e.x, e.y, e.flash > 0 || (e.warn && Math.floor(clock * 16) % 2 === 0));
       if (e.maxHp > 1 && e.hp < e.maxHp) {
         ctx.fillStyle = C.ink; ctx.fillRect(Math.round(e.x - e.w / 2), Math.round(e.y + e.h / 2 + 1), e.w, 1);
         ctx.fillStyle = C.lime; ctx.fillRect(Math.round(e.x - e.w / 2), Math.round(e.y + e.h / 2 + 1), Math.ceil((e.w * e.hp) / e.maxHp), 1);
       }
       // each invader carries the block that made it
-      if (e.type !== 'mini') drawTextC(e.type === 'century' ? `#${e.height}` : e.label, e.x, e.y - e.h / 2 - 7, e.height === run.lastHeight ? C.cyan : C.navy, 1, null);
+      if (e.type !== 'mini') drawTextC(isBoss(e) ? `#${e.height}` : e.label, e.x, e.y - e.h / 2 - 7, e.height === run.lastHeight ? C.cyan : C.navy, 1, null);
     }
     for (const b of bullets) {
       ctx.fillStyle = b.laser ? C.pink : b.homing ? C.orange : C.white;

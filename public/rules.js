@@ -18,14 +18,16 @@ export const tierOf = (n) => Math.min(Math.floor(n / TIER_BLOCKS), MAX_TIER);
 // base points are multiplied by (1 + tier) and then by the multiplier
 export const ENEMIES = {
   drone:    { hp: 1, pts: 10,   unlock: 0, w: 10, h: 8 },
-  zigzag:   { hp: 1, pts: 20,   unlock: 1, w: 10, h: 8 },
-  gunner:   { hp: 2, pts: 40,   unlock: 2, w: 11, h: 9 },
-  splitter: { hp: 2, pts: 30,   unlock: 3, w: 11, h: 9 },
+  zigzag:   { hp: 1, pts: 20,   unlock: 0, w: 10, h: 8 },
+  gunner:   { hp: 2, pts: 40,   unlock: 1, w: 11, h: 9 },
+  splitter: { hp: 2, pts: 30,   unlock: 2, w: 11, h: 9 },
   mini:     { hp: 1, pts: 15,   unlock: 99, w: 6, h: 5 },
-  tank:     { hp: 6, pts: 80,   unlock: 4, w: 15, h: 11 },
-  diver:    { hp: 1, pts: 50,   unlock: 5, w: 9, h: 9 },
-  weaver:   { hp: 4, pts: 100,  unlock: 6, w: 13, h: 9 },
+  tank:     { hp: 6, pts: 80,   unlock: 3, w: 15, h: 11 },
+  diver:    { hp: 1, pts: 50,   unlock: 4, w: 9, h: 9 },
+  weaver:   { hp: 4, pts: 100,  unlock: 5, w: 13, h: 9 },
   century:  { hp: 30, pts: 1000, unlock: 99, w: 32, h: 14 },
+  // every run opens with one, born from the block the run starts on; it stays until you take it out
+  blockmonster: { hp: 24, pts: 500, unlock: 99, w: 26, h: 18 },
 };
 const ROSTER = ['drone', 'zigzag', 'gunner', 'splitter', 'tank', 'diver', 'weaver'];
 
@@ -36,6 +38,7 @@ export const FEATS = {
   combo: 100,     // every 8 kills without letting the chain cool
   unbroken: 200,  // every 40 blocks without taking a hit
   century: 500,   // a century boss
+  blockmonster: 300, // the run's opening boss
   maxedPickup: 100, // a power chip when already at max power
 };
 

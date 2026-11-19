@@ -115,9 +115,14 @@ node once per 100ms and pushes each block (height, hash, time) to every player o
 - **Controls.** Move with the mouse, a finger (drag anywhere) or the arrows/WASD. Fire is automatic. Bomb with Space or
   right-click (the BOMB button on phones). P pauses, M mutes.
 - **Breaches.** An invader that reaches the bottom costs a life, as does a hit. A hit also drops one weapon level.
-- **Waves.** Every 24 blocks (12 seconds) a new tier starts: zigzags, then gunners, splitters, tanks, divers and weavers
-  join. Invaders get 35% tougher and 8% faster per tier, and fire more often and faster; from wave 7 gunners fire in
+- **Waves.** The run opens with drones and zigzags, and the drones shoot: a slow aimed shot every few seconds, with a
+  white blink just before it. Every 24 blocks (12 seconds) a new tier starts: gunners, then splitters, tanks, divers and
+  weavers join. Invaders get 35% tougher and 8% faster per tier, and fire more often and faster; from wave 7 gunners fire in
   pairs. Divers wind up for less time before they dive.
+- **The Blockmonster.** Every run opens with a boss already on screen, born from the block the run starts on and
+  labelled with its height. It hovers at the top, fires aimed shots (it blinks just before) and every third volley a
+  fan, and it stays until you take it out, while the blocks keep bringing invaders. Killing it pays 500 points plus a
+  300 bonus and drops a weapon upgrade.
 - **Century boss.** On any block whose height ends in 00, a mothership arrives instead (not in a run's first 10
   seconds). It gets 15 more hit points per tier, fires faster and in wider fans, and escapes after 40 seconds.
 - **Power chips** drop from about 1 invader in 6, chosen by the block hash (P from about 1 in 12):
