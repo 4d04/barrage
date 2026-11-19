@@ -9,72 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #07071a; --panel: #12123a; --line: #3a3aa8; --text: #eef0ff; --muted: #9a9cd0;
-    --cyan: #5af0ff; --lime: #b4f07a; --gold: #ffd23f; --pink: #ff6ad5; --red: #ff5a5a;
-    --px: 'Press Start 2P', ui-monospace, Menlo, monospace;
-  }
-  * { box-sizing: border-box; }
-  [hidden] { display: none !important; }
-  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--px); }
-  body { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; padding: 14px 16px; gap: 12px; }
-  header { text-align: center; }
-  h1 { margin: 0; font-size: clamp(18px, 4vw, 30px); color: var(--cyan); text-shadow: 3px 3px 0 #2a2a8a; letter-spacing: 2px; }
-  .sub { margin-top: 8px; font-size: 9px; line-height: 1.7; color: var(--muted); }
-  .sub b { color: var(--gold); font-weight: normal; }
-  main { display: flex; gap: 16px; align-items: flex-start; justify-content: center; width: 100%; max-width: 1100px; flex-wrap: wrap; }
-  .stage { position: relative; border: 4px solid var(--line); box-shadow: 0 0 0 4px #000, 8px 8px 0 4px #000; background: #000; line-height: 0;
-    width: min(100%, 576px, calc((100dvh - 120px) * 0.75)); aspect-ratio: 3 / 4; }
-  canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
-  .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
-    background: rgba(7, 7, 26, 0.7); line-height: 1.6; text-align: center; padding: 16px; }
-  .overlay[hidden] { display: none; }
-  #title { cursor: pointer; }
-  .big { font-size: clamp(16px, 4.4vw, 26px); color: var(--cyan); text-shadow: 3px 3px 0 #000; }
-  .blink { animation: blink 1s steps(2, start) infinite; color: var(--gold); font-size: clamp(11px, 2.2vw, 15px); }
-  @keyframes blink { to { visibility: hidden; } }
-  .small { font-size: 8px; color: var(--muted); max-width: 400px; line-height: 2; }
-  .small b { color: var(--text); font-weight: normal; }
-  .score { font-size: clamp(14px, 3.4vw, 22px); color: var(--gold); }
-  .stats { display: grid; grid-template-columns: auto auto; gap: 6px 18px; font-size: 9px; text-align: left; color: var(--muted); }
-  .stats b { color: var(--text); font-weight: normal; text-align: right; }
-  form { display: flex; gap: 10px; align-items: center; }
-  input { font: inherit; font-size: 18px; width: 5.5ch; text-align: center; text-transform: uppercase; background: #000; color: var(--gold);
-    border: 3px solid var(--gold); padding: 8px 4px; outline: none; letter-spacing: 4px; }
-  button { font: inherit; font-size: 10px; background: var(--cyan); color: #07071a; border: 0; padding: 11px 14px; cursor: pointer; box-shadow: 4px 4px 0 #2a2a8a; }
-  button:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #2a2a8a; }
-  button.ghost { background: transparent; color: var(--muted); box-shadow: none; border: 2px solid var(--line); }
-  .msg { font-size: 9px; color: var(--pink); min-height: 1em; line-height: 1.8; max-width: 420px; }
-  .msg.ok { color: var(--lime); }
-  aside { width: 270px; display: flex; flex-direction: column; gap: 14px; }
-  .panel { background: var(--panel); border: 4px solid var(--line); padding: 12px; box-shadow: 4px 4px 0 #000; }
-  .panel h2 { margin: 0 0 12px; font-size: 10px; color: var(--gold); }
-  ol { margin: 0; padding: 0; list-style: none; font-size: 9px; line-height: 2.2; }
-  ol li { display: grid; grid-template-columns: 2.4em 3.4em 1fr; }
-  ol li .s { text-align: right; color: var(--text); }
-  ol li.me { color: var(--pink); }
-  ol li:first-child { color: var(--gold); }
-  ol li.empty { display: block; color: var(--muted); font-size: 8px; line-height: 1.8; }
-  .tip { font-size: 15px; color: var(--cyan); margin-bottom: 6px; }
-  .chainline { font-size: 8px; color: var(--muted); line-height: 1.9; }
-  .chainline b { color: var(--text); font-weight: normal; }
-  .rail { display: flex; gap: 3px; margin: 10px 0 4px; height: 14px; overflow: hidden; }
-  .rail i { flex: 0 0 14px; height: 14px; background: #2a2a8a; }
-  .rail i.new { background: var(--cyan); }
-  .feed { font-size: 8px; line-height: 1.9; color: var(--muted); }
-  .feed div:first-child { color: var(--lime); }
-  .legend { font-size: 8px; line-height: 2.1; color: var(--muted); }
-  .legend span { color: var(--text); }
-  .legend .g { color: var(--gold); }
-  .touch { display: none; position: absolute; right: 10px; bottom: 28px; pointer-events: none; }
-  .touch button { pointer-events: auto; width: 62px; height: 62px; font-size: 9px; opacity: 0.6; background: #000; color: var(--gold); border: 3px solid var(--gold); box-shadow: none; border-radius: 50%; }
-  @media (pointer: coarse) { .touch { display: block; } }
-  footer { font-size: 8px; color: var(--muted); line-height: 1.9; text-align: center; max-width: 860px; }
-  footer kbd { color: var(--text); font-family: inherit; }
-  .mute { padding: 4px 6px; font-size: 7px; margin-left: 8px; vertical-align: middle; }
-  @media (max-width: 640px) { aside { width: 100%; } }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header>

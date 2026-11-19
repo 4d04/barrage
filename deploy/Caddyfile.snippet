@@ -1,12 +1,25 @@
-# Block Barrage: add next to the abbey site block. Only the web server is public; node and plugin RPC stay on loopback.
-# Caddy flushes text/event-stream (the block feed) as it arrives.
+# Block Barrage: add next to the other site blocks. Caddy is the only public listener; the game server, the node and
+# the plugin RPC stay on loopback. Caddy replaces any X-Forwarded-For a client sends, and flushes the block feed as it
+# arrives. The game server sets the page's security headers itself.
 barrage.skylabs.ventures {
 	encode zstd gzip
+	request_body {
+		max_size 32KB
+	}
 	header {
 		Strict-Transport-Security "max-age=31536000"
-		X-Content-Type-Options nosniff
-		Referrer-Policy no-referrer
 		-Server
 	}
-	reverse_proxy 127.0.0.1:8790
+	reverse_proxy 127.0.0.1:8790 {
+		transport http {
+			keepalive 30s
+			response_header_timeout 15s
+		}
+	}
+	log {
+		output file /var/log/caddy/barrage.log {
+			roll_size 50MiB
+			roll_keep 5
+		}
+	}
 }

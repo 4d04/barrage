@@ -4,7 +4,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CANOPY_COMMIT="${CANOPY_COMMIT:-4313b031}"
+CANOPY_COMMIT="${CANOPY_COMMIT:-4313b031f80e546ce5f2dc4c7f367a73e7eb8619}"
 SRC="$HERE/canopy"
 
 if [ ! -d "$SRC/.git" ]; then

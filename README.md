@@ -9,7 +9,7 @@ There's no sign-in and no wallet. Open the page, click, play. When you seal a sc
 
 | Path | What it is |
 |---|---|
-| `public/` | The game: `index.html`, `game.js` (engine, sprites, sound) and `rules.js` (invaders, scoring, shared with the server) |
+| `public/` | The game: `index.html`, `style.css`, `game.js` (engine, sprites, sound) and `rules.js` (invaders, scoring, shared with the server) |
 | `server/` | One Node process: the block feed (SSE), run tickets, score checks, and the relay that signs `submit_score` |
 | `plugin/` | The Canopy plugin (TypeScript, from the core's template): `submit_score`, the board, read-only RPC |
 | `chain/` | `setup.sh` (builds this project's own core), `localnet.sh` (the chain on this machine), `make-chain.py` (config and genesis) |
@@ -69,7 +69,9 @@ If the chain can't be reached, the page falls back to local 500ms practice block
 | `CHAIN_ID` / `NETWORK_ID` | `2` / `1` | Stamped into every transaction |
 | `ARCADE_KEY_FILE` | `chain/.arcade-key.json` | Without it, the game runs but scores are off |
 | `FEE` | `10000` | Per `submit_score`, in micro-units (the chain's send fee) |
-| `PORT` / `HOST` / `TRUST_PROXY` | `8790` / `127.0.0.1` / off | |
+| `PORT` / `HOST` | `8790` / `127.0.0.1` | Keep it on loopback behind a proxy |
+| `TRUST_PROXY` | off | `1` when a proxy on this machine sets `X-Forwarded-For`; without it, all players share one rate limit |
+| `MAX_PLAYERS` / `MAX_SEALS_PER_MINUTE` | `2000` / `120` | Open block feeds, and scores relayed per minute by everyone together |
 
 ## The chain
 
@@ -151,7 +153,8 @@ cd barrage && npm test
 ```
 
 The rules and server checks: plugin and game agree on the ceiling, the ceiling covers a perfect block, spawns are
-deterministic, and bad scores are refused.
+deterministic, and bad scores are refused. It also starts the real server against a fake chain and attacks it: malformed
+requests, path traversal, cross-site posts, forged addresses, feed flooding and leaked errors.
 
 ```bash
 cd barrage/plugin && npm test
@@ -169,26 +172,63 @@ seals a score and times it, checks that a replay is refused, and reads the board
 
 ## Deploy
 
-The files in `deploy/` assume `/opt/barrage` with:
-- `app/`, this directory, with `chain/setup.sh` run on the server (the core needs cgo, so build it there);
-- `bin/canopy`, a copy of `app/chain/bin/canopy`, and `canopy/`, the core checkout (`app/chain/canopy`);
-- `data/game`;
-- `.password`, `arcade-key.json` and `barrage.env` (`BARRAGE_ARCADE_AUTHORITY=<arcade address>`).
+Only Caddy faces the internet. The game server, node and plugin RPC stay on loopback, and each service runs as its own
+user in a systemd sandbox with no route off the machine. The units need systemd 247 or newer, Node 22 at `/opt/node`,
+and Caddy.
 
-Set it up like this:
-1. Make the key on the server with `node server/keygen.js /opt/barrage/arcade-key.json`.
-2. First-boot `data/game`.
-3. Run `chain/make-chain.py /opt/barrage/data/game <arcade address>`.
-4. Delete `data/game/canopy` so the edited genesis applies.
-5. Start `barrage-game` and `barrage-web`, and add the Caddy snippet.
+**Do the firewall first.** The node's first boot uses default settings, and until `make-chain.py` runs those can listen
+on every interface. Allow only SSH, 80 and 443:
 
-Nothing here has been deployed.
+```bash
+sudo ufw default deny incoming && sudo ufw allow OpenSSH && sudo ufw allow 80,443/tcp && sudo ufw enable
+```
+
+Then, as root:
+
+1. Create the users: `useradd -r -s /usr/sbin/nologin barrage-chain` and the same for `barrage-web`.
+2. Put this repo at `/opt/barrage/app`, owned by root. Run `chain/setup.sh`, `npm ci --omit=dev` and
+   `(cd plugin && npm ci && npm run build:all)` there (the core needs cgo, so build on the server).
+3. Create the secrets, readable by root only:
+   `install -d -m 700 /opt/barrage/secrets`, then
+   `(umask 077; openssl rand -hex 32 > /opt/barrage/secrets/keystore-password)`, then
+   `node server/keygen.js /opt/barrage/secrets/arcade-key.json`, which prints the arcade address.
+4. Write `BARRAGE_ARCADE_AUTHORITY=<arcade address>` to `/opt/barrage/barrage.env`.
+5. `install -d -o barrage-chain -g barrage-chain -m 700 /opt/barrage/data /opt/barrage/data/game`, then first-boot the
+   node as `barrage-chain` into `data/game` with that password, and stop it.
+6. Run `chain/make-chain.py /opt/barrage/data/game <arcade address>` and delete `data/game/canopy` so the edited genesis
+   applies. Make sure the files are still owned by `barrage-chain`.
+7. Install both units and the Caddy snippet (with your domain), then start `barrage-game` and `barrage-web`.
+8. Check from another machine that only 22, 80 and 443 answer: `nmap -p- <host>`.
+
+The chain grows by about 240 MB a day at 500ms, so watch the disk. Top up the arcade key if `/barrage/arcade` runs low:
+it starts with enough for 100 million scores.
+
+This setup has not been run on a server yet.
+
+## Security
+
+What the server does against abuse:
+
+| Attack | Defence |
+|---|---|
+| Malformed or oversized requests | Refused without touching game state; bodies capped at 16 KB, headers at 8 KB; slow requests time out |
+| Reading files off the server | Only the page's own files can be served, from a fixed list |
+| Flooding | Per-address limits on every route (IPv6 by /64), caps on open block feeds and players, slow readers dropped, all tables bounded |
+| Spamming the chain | Scores are limited per address and to 120 a minute overall, and each run seals once |
+| Forged client addresses | `X-Forwarded-For` counts only from a local proxy, and only the entry that proxy wrote |
+| Other sites acting for a player, clickjacking, script injection | Cross-site POSTs refused, no CORS, framing denied, a strict Content-Security-Policy with no inline code |
+| Learning about the internals | Chain errors are logged, never sent to players |
+| A compromised web process | No internet access, no access to chain data or the validator's password, and the score key is its only secret |
+
+Report a vulnerability through a private GitHub security advisory on this repo.
 
 ## Limits
 
-- **No accounts means no proof of play.** The server rejects scores the run's blocks make impossible, runs played
-  faster than the chain (under 0.35s per block), reused run ids, and too many requests per IP. The plugin repeats the
-  checks that can run on chain. A determined cheater can still submit a plausible fake score.
+- **No accounts means no proof of play. The leaderboard can be cheated.** The game runs in the browser, so the server
+  can't see what really happened. It rejects scores the run's blocks make impossible, runs played faster than the chain
+  (under 0.35s per block), run tickets over 2 hours old, reused run ids, and too many requests per address, and the
+  plugin repeats the checks it can. A script can still start a run, wait, and claim a high score under the ceiling.
+- **Flood protection stops at this server.** A large distributed attack needs a CDN or your host's protection in front.
 - **The arcade key is the one trust point.** Anyone holding it can write scores. It never leaves the server, and the
   plugin accepts scores from no other key.
 - **Plugin state is consensus state.** Changing `maxScore` or the board rules changes how `submit_score` executes. Do

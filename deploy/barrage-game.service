@@ -4,29 +4,60 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=barrage
-Group=barrage
+User=barrage-chain
+Group=barrage-chain
 # the core runs plugin/barrage/pluginctl.sh relative to its checkout; the plugin stays in this unit's cgroup
-WorkingDirectory=/opt/barrage/canopy
+WorkingDirectory=/opt/barrage/app/chain/canopy
 Environment=CANOPY_DATA_DIR=/opt/barrage/data/game
 Environment=BARRAGE_CHAIN_ID=2
 Environment=BARRAGE_PLUGIN_RPC=127.0.0.1:31010
 # the plugin socket folder (needs the patched core from chain/setup.sh)
 Environment=CANOPY_PLUGIN_SOCKET_DIR=/opt/barrage/data/game/plugin
 Environment=PATH=/opt/node/bin:/usr/local/bin:/usr/bin:/bin
-# BARRAGE_ARCADE_AUTHORITY=<address of /opt/barrage/arcade-key.json>, the only key allowed to submit scores
+# BARRAGE_ARCADE_AUTHORITY=<arcade address>, the only key allowed to submit scores (an address, not a secret)
 EnvironmentFile=/opt/barrage/barrage.env
-ExecStart=/bin/sh -c 'exec /opt/barrage/bin/canopy --data-dir /opt/barrage/data/game --password "$(cat /opt/barrage/.password)" --nickname barrage start'
+# root-owned on disk; systemd hands this unit a private copy
+LoadCredential=keystore-password:/opt/barrage/secrets/keystore-password
+ExecStart=/bin/sh -c 'exec /opt/barrage/app/chain/bin/canopy --data-dir /opt/barrage/data/game --password "$(cat "$CREDENTIALS_DIRECTORY/keystore-password")" --nickname barrage start'
 Restart=on-failure
 RestartSec=5
 KillMode=control-group
 StandardOutput=null
 StandardError=journal
+UMask=0077
+LimitNOFILE=8192
+TasksMax=512
+MemoryMax=4G
+
+# one validator and no peers: nothing here talks to anything but this machine
+IPAddressDeny=any
+IPAddressAllow=localhost
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# the sandbox (no MemoryDenyWriteExecute: the plugin runs on Node, whose JIT needs it)
 NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
 PrivateTmp=yes
+PrivateDevices=yes
 ProtectSystem=strict
 ProtectHome=yes
+ProtectProc=invisible
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
 ReadWritePaths=/opt/barrage/data/game
+InaccessiblePaths=-/opt/barrage/secrets
 
 [Install]
 WantedBy=multi-user.target

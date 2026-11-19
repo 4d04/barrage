@@ -51,5 +51,6 @@ test('server checks: a good run passes; bad ones are refused', () => {
   assert.match(bad({ bestMultiplier: 64 }), /multiplier/);
   assert.match(bad({}, 1061, 10_000), /faster than the chain/);
   assert.match(bad({ score: 1.5 }), /numbers/);
+  assert.match(bad({}, 1061, 3 * 3600_000), /expired/);
   assert.match(validateScore({ run: undefined, body: good, tip: 1061, now: 30_000 }).error, /unknown/);
 });

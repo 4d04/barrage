@@ -47,18 +47,26 @@ export function StartRPCServer(plugin: Plugin): void {
         return;
     }
     const server = http.createServer((req, res) => {
-        // read-only public data: any web page may read it (the browser client is served from another origin)
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        if (req.method === 'OPTIONS') {
-            res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-            res.setHeader('Access-Control-Max-Age', '600');
-            res.statusCode = 204;
-            res.end();
+        // only the arcade server reads this, over loopback, so browsers get no cross-origin access
+        if (req.method !== 'GET') {
+            writeJSON(res, 405, { error: 'method not allowed' });
             return;
         }
-        route(new Store(new QueryBackend(plugin, Number(new URL(req.url || '/', 'http://x').searchParams.get('height') || 0))), req.url || '/')
+        let height = 0;
+        try {
+            const h = new URL(req.url || '/', 'http://x').searchParams.get('height') || '0';
+            if (!/^\d{1,15}$/.test(h)) throw new Error('bad height');
+            height = Number(h);
+        } catch {
+            writeJSON(res, 400, { error: 'bad request' });
+            return;
+        }
+        route(new Store(new QueryBackend(plugin, height)), req.url || '/')
             .then(([status, body]) => writeJSON(res, status, body))
-            .catch((e) => writeJSON(res, 500, { error: String((e as Error).message ?? e) }));
+            .catch((e) => {
+                console.log(`plugin RPC error: ${String((e as Error).message ?? e)}`);
+                writeJSON(res, 500, { error: 'internal error' });
+            });
     });
     const idx = addr.lastIndexOf(':');
     const host = idx >= 0 ? addr.slice(0, idx) : '127.0.0.1';

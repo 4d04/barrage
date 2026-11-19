@@ -5,10 +5,12 @@ import { MAX_KILLS_PER_BLOCK, MAX_MULT, MAX_POWER, maxScore } from '../public/ru
 
 export const INITIALS_RE = /^[A-Z0-9]{1,3}$/;
 export const MIN_SECONDS_PER_BLOCK = 0.35; // blocks are 500ms; allows for jitter and catch-up bursts
+export const MAX_RUN_MS = 2 * 3600_000; // a run ticket expires: it can't be left open to bank a huge score ceiling
 const int = (v) => Number.isSafeInteger(v);
 
 export function validateScore({ run, body, tip, now }) {
   if (!run) return { ok: false, error: 'unknown or already used run' };
+  if (now - run.startedAt > MAX_RUN_MS) return { ok: false, error: 'run expired' };
   if (!body || typeof body !== 'object') return { ok: false, error: 'bad body' };
   const initials = String(body.initials ?? '').toUpperCase().trim();
   if (!INITIALS_RE.test(initials)) return { ok: false, error: 'initials must be 1-3 letters or digits' };

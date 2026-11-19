@@ -49,6 +49,9 @@ c.update({
     "roundInterruptTimeoutMS": 250,
 })
 
+# the core binds its RPC, admin and profiling ports to this host: they must never face the network
+assert c["listenAddress"].startswith("127.0.0.1:") and c["headless"], "the node must stay on loopback and headless"
+
 g = json.load(open(os.path.join(data, "genesis.json")))
 assert len(g["validators"]) == 1, "expected one genesis validator"
 g["params"]["consensus"]["rootChainID"] = CHAIN_ID
